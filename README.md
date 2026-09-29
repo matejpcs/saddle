@@ -48,6 +48,18 @@ The player is not disconnected solely because the optional UDP path cannot be es
 - Client installations
 - TCP-only tunnel environments such as the inspected Netflared setup
 
+## Client and server installation
+
+Saddle is a replacement for Sable, not a client-only cosmetic mod. Install the
+same Saddle JAR on the dedicated server and on every client. The JAR keeps
+Sable's mod ID (`sable`) so Sable-dependent mods continue to resolve their
+dependency, but the server still needs the library and its matching network
+payloads present.
+
+For a TCP-only tunnel or a network where UDP is blocked, set Saddle's
+`disable_udp_pipeline` client option to `true`. Minecraft login and gameplay
+remain on TCP; UDP is only an optional optimization.
+
 ## Build
 
 Initialize the pinned upstream source:

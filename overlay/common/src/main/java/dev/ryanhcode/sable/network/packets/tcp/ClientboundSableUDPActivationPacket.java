@@ -39,11 +39,17 @@ public record ClientboundSableUDPActivationPacket(UUID uuid) implements SableTCP
 
     @Override
     public void handle(final PacketContext context) {
-        final Connection connection = Minecraft.getInstance().getConnection().getConnection();
+        final Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.getConnection() == null) {
+            Sable.LOGGER.warn("[sable-udp] Received UDP activation packet without an active Minecraft connection; remaining on TCP-only");
+            return;
+        }
+
+        final Connection connection = minecraft.getConnection().getConnection();
         final ConnectionExtension connectionExtension = (ConnectionExtension) connection;
         final Channel channel = connectionExtension.sable$getUDPChannel();
 
-        if (channel == null) {
+        if (channel == null || !channel.isActive()) {
             Sable.LOGGER.warn("[sable-udp] Received UDP activation packet but no UDP channel is available on this connection; remaining on TCP-only");
             return;
         }

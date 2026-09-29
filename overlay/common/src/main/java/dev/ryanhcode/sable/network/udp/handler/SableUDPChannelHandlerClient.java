@@ -8,6 +8,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.network.Connection;
 
 public class SableUDPChannelHandlerClient extends SimpleChannelInboundHandler<AddressedSableUDPPacket> {
@@ -43,14 +44,25 @@ public class SableUDPChannelHandlerClient extends SimpleChannelInboundHandler<Ad
     public void channelInactive(final ChannelHandlerContext ctx) throws Exception {
         super.channelInactive(ctx);
         Sable.LOGGER.info("Client UDP channel inactive");
+
+        final ConnectionExtension connectionExtension = (ConnectionExtension) this.connection;
+        if (connectionExtension.sable$getUDPChannel() == ctx.channel()) {
+            connectionExtension.sable$setUDPChannel(null);
+        }
     }
 
     @Override
     protected void channelRead0(final ChannelHandlerContext ctx, final AddressedSableUDPPacket msg) throws Exception {
         final Minecraft client = Minecraft.getInstance();
+        final ClientLevel level = client.level;
+
+        if (level == null) {
+            Sable.LOGGER.debug("[sable-udp] Dropping UDP packet while the client world is not ready: {}", msg.packet().getClass().getName());
+            return;
+        }
 
         SableClient.NETWORK_EVENT_LOOP.tell(() -> {
-            msg.packet().handleClient(client.level);
+            msg.packet().handleClient(level);
         });
     }
 }

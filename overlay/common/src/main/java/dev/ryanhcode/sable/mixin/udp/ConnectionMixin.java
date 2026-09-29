@@ -41,8 +41,12 @@ public abstract class ConnectionMixin implements ConnectionExtension {
     @Inject(method = "disconnect(Lnet/minecraft/network/DisconnectionDetails;)V", at = @At("TAIL"))
     private void sable$onDisconnect(final DisconnectionDetails disconnectionDetails, final CallbackInfo ci) {
         final Channel channel = this.sable$udpChannel;
-        if (this.sable$udpChannel != null && this.sable$udpChannel.isOpen()) {
+        if (channel != null) {
             this.sable$udpChannel = null;
+
+            if (!channel.isOpen()) {
+                return;
+            }
 
             Sable.LOGGER.debug("[sable-udp] closing UDP channel on disconnect, reason={}",
                     disconnectionDetails != null ? disconnectionDetails.reason().getString() : "<no details>");
