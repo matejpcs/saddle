@@ -43,7 +43,12 @@ PY
 
 echo "Saddle: applying networking overlay"
 cd "$UPSTREAM"
-./gradlew --no-daemon :sable_rapier:buildRustNatives :neoforge:build
+if [[ ! -f "sable_rapier/src/main/resources/natives/sable_rapier/sable_rapier_binaries.zip.l4z" ]]; then
+  echo "Saddle: upstream native bundle is missing; refusing to build a broken JAR" >&2
+  exit 1
+fi
+
+./gradlew --no-daemon :neoforge:build
 
 JAR="$(find neoforge/build/libs -maxdepth 1 -type f -name "*.jar" ! -name "*sources*" ! -name "*dev*" | head -n 1)"
 if [[ -z "$JAR" ]]; then
