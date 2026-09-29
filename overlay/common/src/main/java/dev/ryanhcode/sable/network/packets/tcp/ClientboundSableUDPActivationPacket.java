@@ -7,6 +7,8 @@ import dev.ryanhcode.sable.network.tcp.SableTCPPacket;
 import dev.ryanhcode.sable.network.udp.AddressedSableUDPPacket;
 import foundry.veil.api.network.handler.PacketContext;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.Connection;
 import net.minecraft.network.FriendlyByteBuf;
@@ -18,10 +20,9 @@ import java.net.InetSocketAddress;
 import java.util.UUID;
 
 public record ClientboundSableUDPActivationPacket(UUID uuid) implements SableTCPPacket {
-    public static final Type<ClientboundSableUDPActivationPacket> TYPE =
-            new Type<>(Sable.sablePath("udp_activation"));
-    public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundSableUDPActivationPacket> CODEC =
-            StreamCodec.of((buf, value) -> value.write(buf), ClientboundSableUDPActivationPacket::read);
+
+    public static final Type<ClientboundSableUDPActivationPacket> TYPE = new Type<>(Sable.sablePath("udp_activation"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundSableUDPActivationPacket> CODEC = StreamCodec.of((buf, value) -> value.write(buf), ClientboundSableUDPActivationPacket::read);
 
     private void write(final FriendlyByteBuf buf) {
         buf.writeUUID(this.uuid);
@@ -38,42 +39,36 @@ public record ClientboundSableUDPActivationPacket(UUID uuid) implements SableTCP
 
     @Override
     public void handle(final PacketContext context) {
-        final Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.getConnection() == null) {
-            Sable.LOGGER.warn("[saddle-udp] UDP activation arrived without a client connection");
+        final Connection connection = Minecraft.getInstance().getConnection().getConnection();
+        final ConnectionExtension connectionExtension = (ConnectionExtension) connection;
+        final Channel channel = connectionExtension.sable$getUDPChannel();
+
+        if (channel == null) {
+            Sable.LOGGER.warn("[sable-udp] Received UDP activation packet but no UDP channel is available on this connection; remaining on TCP-only");
             return;
         }
 
-        final Connection connection = minecraft.getConnection().getConnection();
-        final Channel channel = ((ConnectionExtension) connection).sable$getUDPChannel();
-        if (channel == null || !channel.isOpen()) {
-            Sable.LOGGER.warn(
-                    "[saddle-udp] UDP activation arrived but UDP is unavailable; staying TCP-only");
+        if (!(connection.getRemoteAddress() instanceof final InetSocketAddress baseAddress)) {
+            Sable.LOGGER.warn("[sable-udp] Received UDP activation packet but remote address is not an InetSocketAddress ({}); skipping UDP auth", connection.getRemoteAddress());
             return;
         }
 
-        if (!(connection.getRemoteAddress() instanceof final InetSocketAddress remote)) {
-            Sable.LOGGER.warn("[saddle-udp] UDP activation has unsupported remote address {}; staying TCP-only",
-                    connection.getRemoteAddress());
-            return;
-        }
+        final InetSocketAddress remoteAddress = new InetSocketAddress(baseAddress.getAddress(), baseAddress.getPort());
 
-        final InetSocketAddress udpRemote = new InetSocketAddress(remote.getAddress(), remote.getPort());
+        Sable.LOGGER.info("Received authentication request, sending response over UDP to {}", remoteAddress);
+
         channel.eventLoop().execute(() -> {
-            if (!channel.isActive()) {
-                Sable.LOGGER.debug("[saddle-udp] UDP channel became inactive before authentication");
-                return;
-            }
+            final SableUDPAuthenticationPacket packet = new SableUDPAuthenticationPacket(this.uuid.toString());
 
-            final Channel authChannel = channel;
-            authChannel.writeAndFlush(new AddressedSableUDPPacket(
-                    new SableUDPAuthenticationPacket(this.uuid.toString()), udpRemote))
-                    .addListener(f -> {
-                        if (!f.isSuccess()) {
-                            Sable.LOGGER.warn("[saddle-udp] UDP authentication send failed to {}",
-                                    udpRemote, f.cause());
-                        }
-                    });
+            final AddressedSableUDPPacket envelope = new AddressedSableUDPPacket(packet, remoteAddress);
+            final ChannelFuture writeFuture = channel.writeAndFlush(envelope);
+
+            writeFuture.addListener((ChannelFutureListener) f -> {
+                if (!f.isSuccess()) {
+                    Sable.LOGGER.warn("[sable-udp] Failed to send UDP auth response to {}: {}",
+                            remoteAddress, f.cause() != null ? f.cause().toString() : "<no cause>");
+                }
+            });
         });
     }
 }
