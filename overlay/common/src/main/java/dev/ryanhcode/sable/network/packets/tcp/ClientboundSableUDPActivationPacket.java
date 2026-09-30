@@ -1,14 +1,10 @@
 package dev.ryanhcode.sable.network.packets.tcp;
 
 import dev.ryanhcode.sable.Sable;
+import dev.ryanhcode.sable.SableClientConfig;
 import dev.ryanhcode.sable.mixinterface.udp.ConnectionExtension;
-import dev.ryanhcode.sable.network.packets.udp.SableUDPAuthenticationPacket;
 import dev.ryanhcode.sable.network.tcp.SableTCPPacket;
-import dev.ryanhcode.sable.network.udp.AddressedSableUDPPacket;
 import foundry.veil.api.network.handler.PacketContext;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.Connection;
 import net.minecraft.network.FriendlyByteBuf;
@@ -16,7 +12,6 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
-import java.net.InetSocketAddress;
 import java.util.UUID;
 
 public record ClientboundSableUDPActivationPacket(UUID uuid) implements SableTCPPacket {
@@ -39,42 +34,18 @@ public record ClientboundSableUDPActivationPacket(UUID uuid) implements SableTCP
 
     @Override
     public void handle(final PacketContext context) {
+        if (!SableClientConfig.ATTEMPT_UDP_NETWORKING.get()) {
+            Sable.LOGGER.info("Received UDP authentication request, ignoring because client UDP networking is disabled");
+            return;
+        }
+
         final Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.getConnection() == null) {
-            Sable.LOGGER.warn("[sable-udp] Received UDP activation packet without an active Minecraft connection; remaining on TCP-only");
+            Sable.LOGGER.warn("[sable-udp] Received UDP activation without an active Minecraft connection; remaining on TCP-only");
             return;
         }
 
         final Connection connection = minecraft.getConnection().getConnection();
-        final ConnectionExtension connectionExtension = (ConnectionExtension) connection;
-        final Channel channel = connectionExtension.sable$getUDPChannel();
-
-        if (channel == null || !channel.isActive()) {
-            Sable.LOGGER.warn("[sable-udp] Received UDP activation packet but no UDP channel is available on this connection; remaining on TCP-only");
-            return;
-        }
-
-        if (!(connection.getRemoteAddress() instanceof final InetSocketAddress baseAddress)) {
-            Sable.LOGGER.warn("[sable-udp] Received UDP activation packet but remote address is not an InetSocketAddress ({}); skipping UDP auth", connection.getRemoteAddress());
-            return;
-        }
-
-        final InetSocketAddress remoteAddress = new InetSocketAddress(baseAddress.getAddress(), baseAddress.getPort());
-
-        Sable.LOGGER.info("Received authentication request, sending response over UDP to {}", remoteAddress);
-
-        channel.eventLoop().execute(() -> {
-            final SableUDPAuthenticationPacket packet = new SableUDPAuthenticationPacket(this.uuid.toString());
-
-            final AddressedSableUDPPacket envelope = new AddressedSableUDPPacket(packet, remoteAddress);
-            final ChannelFuture writeFuture = channel.writeAndFlush(envelope);
-
-            writeFuture.addListener((ChannelFutureListener) f -> {
-                if (!f.isSuccess()) {
-                    Sable.LOGGER.warn("[sable-udp] Failed to send UDP auth response to {}: {}",
-                            remoteAddress, f.cause() != null ? f.cause().toString() : "<no cause>");
-                }
-            });
-        });
+        ((ConnectionExtension) connection).sable$queueUDPAuthentication(this.uuid);
     }
 }

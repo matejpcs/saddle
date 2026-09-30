@@ -19,7 +19,13 @@ copy_overlay() {
 }
 
 copy_overlay common/src/main/java/dev/ryanhcode/sable/mixin/udp/ConnectionMixin.java common/src/main/java/dev/ryanhcode/sable/mixin/udp/ConnectionMixin.java
+copy_overlay common/src/main/java/dev/ryanhcode/sable/mixinterface/udp/ConnectionExtension.java common/src/main/java/dev/ryanhcode/sable/mixinterface/udp/ConnectionExtension.java
+copy_overlay common/src/main/java/dev/ryanhcode/sable/mixin/udp/ServerConnectionListenerMixin.java common/src/main/java/dev/ryanhcode/sable/mixin/udp/ServerConnectionListenerMixin.java
+copy_overlay common/src/main/java/dev/ryanhcode/sable/SableConfig.java common/src/main/java/dev/ryanhcode/sable/SableConfig.java
+copy_overlay common/src/main/java/dev/ryanhcode/sable/SableClientConfig.java common/src/main/java/dev/ryanhcode/sable/SableClientConfig.java
+copy_overlay common/src/main/java/dev/ryanhcode/sable/network/udp/SableUDPAddress.java common/src/main/java/dev/ryanhcode/sable/network/udp/SableUDPAddress.java
 copy_overlay common/src/main/java/dev/ryanhcode/sable/network/packets/tcp/ClientboundSableUDPActivationPacket.java common/src/main/java/dev/ryanhcode/sable/network/packets/tcp/ClientboundSableUDPActivationPacket.java
+copy_overlay common/src/main/java/dev/ryanhcode/sable/network/packets/udp/SableUDPClientboundKeepAlivePacket.java common/src/main/java/dev/ryanhcode/sable/network/packets/udp/SableUDPClientboundKeepAlivePacket.java
 copy_overlay common/src/main/java/dev/ryanhcode/sable/network/udp/handler/SableUDPChannelHandlerClient.java common/src/main/java/dev/ryanhcode/sable/network/udp/handler/SableUDPChannelHandlerClient.java
 
 python3 - "$UPSTREAM/gradle.properties" <<'PY'

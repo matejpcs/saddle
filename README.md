@@ -18,11 +18,15 @@ UDP is therefore an optimization rather than a prerequisite for establishing the
 
 ## Changes in this revision
 
-- Client UDP bootstrap no longer blocks indefinitely.
+- Client UDP bootstrap is fully asynchronous and never blocks the Minecraft joining screen.
+- UDP connection attempts have a configurable hard limit of 240 seconds by default; a failed UDP attempt never prevents TCP login.
 - `disable_udp_pipeline` is honored client-side.
 - UDP bootstrap exceptions cannot abort the Minecraft login path.
 - A late UDP connection is closed instead of being attached after the login path has moved on.
-- UDP activation safely handles a missing/inactive channel.
+- UDP activation tokens are queued until the channel becomes active instead of being lost during a slow join.
+- UDP authentication and keep-alive packets use the configured client endpoint.
+- The UDP server listen port can be configured independently of the Minecraft TCP port.
+- A client low-power preset disables optional Sable rendering effects that are expensive on low-end hardware.
 - UDP channel loss clears the connection's channel reference.
 - UDP packet handling does not call into a missing client level.
 - The same NeoForge artifact is intended for client and dedicated server use.
@@ -59,6 +63,27 @@ payloads present.
 For a TCP-only tunnel or a network where UDP is blocked, set Saddle's
 `disable_udp_pipeline` client option to `true`. Minecraft login and gameplay
 remain on TCP; UDP is only an optional optimization.
+
+### UDP endpoint configuration
+
+The client options are in the Sable/Saddle client config and are also exposed
+by the loader's config button in the Mods menu when Forge Config API Port is
+installed. `udp_server_address` is optional and defaults to the Minecraft
+server address. `udp_server_port` is optional and defaults to the Minecraft
+server port. Changes are saved automatically by the config screen.
+
+For a Playit-style UDP tunnel, set the server's common config to the local
+forwarded port, for example:
+
+    udp_listen_port = 16273
+
+Then set the client's `udp_server_address` to the public Playit hostname (or
+IP) and `udp_server_port` to the public Playit UDP port. The Minecraft TCP
+connection can continue to use its normal address and port.
+
+On low-power clients, enable `low_power_mode` in the client config. This
+turns off dynamic sub-level shading, water occlusion, and sub-level skylight
+shadows while preserving the gameplay/networking path.
 
 ## Build
 
